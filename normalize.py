@@ -175,6 +175,7 @@ def stack_channels(
             arr = np.zeros((h, w), dtype=np.float32)
         if valid_mask is not None:
             arr = np.where(valid_mask, arr, 0.0)
+        arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
         channels.append(arr)
     stacked = np.stack(channels, axis=0)  # (C, H, W)
     return stacked

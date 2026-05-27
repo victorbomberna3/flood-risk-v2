@@ -176,9 +176,9 @@ def engineer_weather(weather_dict: dict) -> dict:
     # Soil moisture
     if "swvl1_mean" in weather_dict:
         swvl = weather_dict["swvl1_mean"]  # (T, H, W)
-        out["soil_moist_max"] = np.nanmax(swvl, axis=0).astype(np.float32)
-        out["soil_moist_mean"] = np.nanmean(swvl, axis=0).astype(np.float32)
-        out["soil_moist_std"] = np.nanstd(swvl, axis=0).astype(np.float32)
+        out["soil_moist_max"] = np.nan_to_num(np.nanmax(swvl, axis=0), nan=0.0).astype(np.float32)
+        out["soil_moist_mean"] = np.nan_to_num(np.nanmean(swvl, axis=0), nan=0.0).astype(np.float32)
+        out["soil_moist_std"] = np.nan_to_num(np.nanstd(swvl, axis=0), nan=0.0).astype(np.float32)
 
     # Wind / temp / dewpoint — INTENTIONALLY OMITTED.
     # These act as regional proxies (Severn is mild/wet, Northumbria is cold/windy).
