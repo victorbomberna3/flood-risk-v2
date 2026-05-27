@@ -30,7 +30,7 @@ class RegionRaster:
 
     @property
     def shape(self) -> tuple[int, int]:
-        return self.terrain["dtm"].shape
+        return next(iter(self.terrain.values())).shape
 
     @property
     def n_land_pixels(self) -> int:
