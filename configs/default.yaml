@@ -92,21 +92,21 @@ model:
 training:
   batch_size: 16
   num_workers: 4
-  epochs: 30
-  lr: 1.0e-3
+  epochs: 60
+  lr: 5.0e-4
   weight_decay: 1.0e-4
   optimizer: "adamw"
   scheduler: "cosine"
-  warmup_epochs: 2
+  warmup_epochs: 3
   mixed_precision: true
   grad_clip: 1.0
   seed: 42
 
 # ── Loss ─────────────────────────────────────────────────────────────────────
 loss:
-  type: "weighted_ce"       # weighted_ce or focal
-  focal_gamma: 2.0          # only used if type=focal
-  class_weight_method: "inverse_freq"   # inverse_freq or effective_num
+  type: "focal"             # weighted_ce or focal
+  focal_gamma: 2.0          # focal: down-weights easy pixels, forces learning on rare classes
+  class_weight_method: "effective_num"  # effective_num more stable than inverse_freq with focal
   ordinal_weight: 0.5       # auxiliary ordinal MSE term — penalises big class mistakes more
   task_weights:             # weight each depth equally — fine to tune later
     risk_0_2m: 1.0
