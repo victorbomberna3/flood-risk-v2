@@ -50,13 +50,16 @@ def main():
     print(f"  Saved at epoch {ckpt['epoch']}, val Macro F1 = {ckpt['val_metrics']['macro_f1_mean']:.4f}")
 
     # Load test raster
+    feature_names = config["features"]["terrain"] + config["features"]["weather"]
     print(f"\n  Loading {test_region} raster...")
-    raster = load_raster(cache_dir / f"raster_{test_region}.npz")
+    raster = load_raster(cache_dir / f"raster_{test_region}.npz", feature_names=feature_names)
     print(f"  {raster}")
 
-    # Stack channels
-    feature_names = config["features"]["terrain"] + config["features"]["weather"]
+    # Stack channels — apply identical preprocessing as training
     channels = stack_channels(raster.terrain, feature_names, valid_mask=raster.valid_mask)
+    raster.terrain = {}
+    channels = np.nan_to_num(channels, nan=0.0, posinf=0.0, neginf=0.0)
+    channels = np.clip(channels, -500, 500)
     print(f"  Channels: {channels.shape}")
 
     # Build model and load weights
