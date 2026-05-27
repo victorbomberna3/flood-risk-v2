@@ -121,6 +121,7 @@ def main():
     )
 
     print("\n" + "=" * 60)
+    print(f"  Mean QWK      (Northumbria): {metrics['qwk_mean']:.4f}  ← primary")
     print(f"  Mean Macro F1 (Northumbria): {metrics['macro_f1_mean']:.4f}")
     print(f"  Outputs in: {out_dir}")
     print("=" * 60)

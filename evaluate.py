@@ -7,7 +7,7 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from sklearn.metrics import f1_score, confusion_matrix, classification_report
+from sklearn.metrics import f1_score, confusion_matrix, classification_report, cohen_kappa_score
 
 
 CLASS_NAMES = ["No risk", "Very Low", "Low", "Medium", "High"]
@@ -23,9 +23,10 @@ def compute_metrics(
     valid_mask: np.ndarray,         # (H, W) bool
     target_names: list[str],
 ) -> dict:
-    """Compute Macro F1, per-class F1, and confusion matrix for each depth."""
+    """Compute Macro F1, QWK, per-class F1, and confusion matrix for each depth."""
     out = {}
     macro_f1_per_target = []
+    qwk_per_target = []
     for i, tname in enumerate(target_names):
         y_true = targets[:, :, i]
         y_pred = preds[i]
@@ -43,15 +44,24 @@ def compute_metrics(
         per_class_f1 = f1_score(yt, yp, labels=labels, average=None, zero_division=0).tolist()
         cm = confusion_matrix(yt, yp, labels=labels).tolist()
 
+        # QWK: penalises errors quadratically by ordinal distance (class 4 vs 3 << class 4 vs 0)
+        try:
+            qwk = float(cohen_kappa_score(yt, yp, weights="quadratic", labels=labels))
+        except Exception:
+            qwk = 0.0
+
         out[tname] = {
             "macro_f1": macro_f1,
+            "qwk": qwk,
             "per_class_f1": per_class_f1,
             "confusion_matrix": cm,
             "n_pixels": int(mask.sum()),
         }
         macro_f1_per_target.append(macro_f1)
+        qwk_per_target.append(qwk)
 
     out["macro_f1_mean"] = float(np.mean(macro_f1_per_target)) if macro_f1_per_target else 0.0
+    out["qwk_mean"] = float(np.mean(qwk_per_target)) if qwk_per_target else 0.0
     return out
 
 
@@ -65,15 +75,16 @@ def save_metrics(metrics: dict, out_path: str | Path) -> None:
 
 def print_summary(metrics: dict, target_names: list[str]) -> None:
     """Print a clean summary table to stdout."""
-    print("\n" + "=" * 64)
-    print(f"  Mean Macro F1 across all depths: {metrics['macro_f1_mean']:.4f}")
-    print("=" * 64)
-    print(f"\n  {'Depth':<12} {'Macro F1':>10}  {'Per-class F1 (cls 0..4)':<40}")
-    print("  " + "─" * 62)
+    print("\n" + "=" * 72)
+    print(f"  Mean Macro F1 across all depths : {metrics['macro_f1_mean']:.4f}")
+    print(f"  Mean QWK     across all depths  : {metrics['qwk_mean']:.4f}  ← primary metric")
+    print("=" * 72)
+    print(f"\n  {'Depth':<12} {'Macro F1':>10}  {'QWK':>8}  {'Per-class F1 (cls 0..4)':<40}")
+    print("  " + "─" * 70)
     for tname in target_names:
         m = metrics[tname]
         per_class = "  ".join(f"{f:.2f}" for f in m["per_class_f1"])
-        print(f"  {tname:<12} {m['macro_f1']:>10.4f}  {per_class}")
+        print(f"  {tname:<12} {m['macro_f1']:>10.4f}  {m['qwk']:>8.4f}  {per_class}")
     print()
 
 
@@ -136,7 +147,7 @@ def plot_confusion_matrices(
         # Normalise by row (per true class)
         cm_norm = cm / np.maximum(cm.sum(axis=1, keepdims=True), 1)
         im = ax.imshow(cm_norm, cmap="Blues", vmin=0, vmax=1)
-        ax.set_title(f"{tname}\nMacro F1 = {metrics[tname]['macro_f1']:.3f}", fontsize=9)
+        ax.set_title(f"{tname}\nQWK = {metrics[tname]['qwk']:.3f}  |  Macro F1 = {metrics[tname]['macro_f1']:.3f}", fontsize=9)
         ax.set_xlabel("Predicted")
         ax.set_ylabel("True")
         ax.set_xticks(range(N_CLASSES))
