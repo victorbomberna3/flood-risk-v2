@@ -122,7 +122,7 @@ class MaskedMultiTaskLoss(nn.Module):
             # Ordinal MSE: penalises expected_class vs true_class quadratically
             if self.ordinal_weight > 0:
                 probs = F.softmax(logits.float(), dim=1)   # (B, C, H, W)
-                ci = self.class_idx.view(1, -1, 1, 1)
+                ci = self.class_idx.view(1, -1, 1, 1).to(probs.device)
                 expected_cls = (probs * ci).sum(dim=1)     # (B, H, W)
                 # Normalise by (N-1)² so scale matches QWK weights
                 ord_loss = F.mse_loss(
