@@ -168,12 +168,13 @@ def train_model(
         }
         history.append(log)
         n_t = len(config["targets"])
+        qwk_per_task = [f"{val_metrics[f'task_{i}_qwk']:.3f}" for i in range(n_t)]
         print(
             f"  Ep {epoch:2d}/{epochs}  "
             f"loss={train_loss:.4f}  "
             f"val_QWK={val_metrics['qwk_mean']:.4f}  "
             f"val_F1={val_metrics['macro_f1_mean']:.4f}  "
-            f"per-task_QWK={[f\"{val_metrics[f'task_{i}_qwk']:.3f}\" for i in range(n_t)]}  "
+            f"per-task_QWK={qwk_per_task}  "
             f"[{elapsed:.0f}s]"
         )
 
