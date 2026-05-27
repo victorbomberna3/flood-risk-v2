@@ -47,7 +47,9 @@ def main():
 
     print(f"\n  Loading checkpoint: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location=device)
-    print(f"  Saved at epoch {ckpt['epoch']}, val Macro F1 = {ckpt['val_metrics']['macro_f1_mean']:.4f}")
+    vm = ckpt["val_metrics"]
+    qwk_str = f"QWK={vm['qwk_mean']:.4f}" if "qwk_mean" in vm else f"Macro F1={vm['macro_f1_mean']:.4f}"
+    print(f"  Saved at epoch {ckpt['epoch']}, val {qwk_str}")
 
     # Load test raster
     feature_names = config["features"]["terrain"] + config["features"]["weather"]

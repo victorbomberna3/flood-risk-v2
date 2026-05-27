@@ -125,8 +125,8 @@ def main():
     )
 
     print("\n" + "=" * 60)
-    print(f"  Best val Macro F1: {result['best_metric']:.4f}")
-    print(f"  Best checkpoint:   {result['best_checkpoint']}")
+    print(f"  Best val QWK:    {result['best_metric']:.4f}  ← primary metric")
+    print(f"  Best checkpoint: {result['best_checkpoint']}")
     print("=" * 60)
 
 

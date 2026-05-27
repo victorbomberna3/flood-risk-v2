@@ -107,6 +107,7 @@ loss:
   type: "weighted_ce"       # weighted_ce or focal
   focal_gamma: 2.0          # only used if type=focal
   class_weight_method: "inverse_freq"   # inverse_freq or effective_num
+  ordinal_weight: 0.5       # auxiliary ordinal MSE term — penalises big class mistakes more
   task_weights:             # weight each depth equally — fine to tune later
     risk_0_2m: 1.0
     risk_0_3m: 1.0
@@ -119,7 +120,7 @@ validation:
   strategy: "spatial_block" # spatial_block (recommended) or random
   block_size_pixels: 256    # validation blocks size
   val_fraction: 0.2         # 20% of Severn patches held out
-  monitor_metric: "macro_f1_mean"
+  monitor_metric: "qwk_mean"
   save_best_only: true
 
 # ── Inference ────────────────────────────────────────────────────────────────

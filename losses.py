@@ -48,13 +48,20 @@ def compute_class_weights(
 
 class MaskedMultiTaskLoss(nn.Module):
     """
-    Sum of weighted cross-entropy losses across 5 flood depths.
+    Sum of weighted cross-entropy losses across 5 flood depths,
+    with an optional ordinal MSE auxiliary term.
+
+    The ordinal term computes E[predicted_class] via softmax and
+    penalises it with MSE against the true class — this directly
+    penalises large ordinal mistakes (class 0 vs 3) more than small
+    ones (class 3 vs 4), mimicking QWK during training.
 
     Args:
-        class_weights: dict {task_idx: (n_classes,) tensor}
-        task_weights:  (5,) tensor — per-depth weighting
-        ignore_index:  pixels with target == this value are ignored
-        focal_gamma:   if > 0, apply focal loss instead of standard CE
+        class_weights:  dict {task_idx: (n_classes,) tensor}
+        task_weights:   (5,) tensor — per-depth weighting
+        ignore_index:   pixels with target == this value are ignored
+        focal_gamma:    if > 0, apply focal loss instead of standard CE
+        ordinal_weight: weight on ordinal MSE term (0 = disabled)
     """
     def __init__(
         self,
@@ -62,14 +69,23 @@ class MaskedMultiTaskLoss(nn.Module):
         task_weights: torch.Tensor,
         ignore_index: int = -1,
         focal_gamma: float = 0.0,
+        ordinal_weight: float = 0.0,
+        n_classes: int = 5,
     ):
         super().__init__()
         self.ignore_index = ignore_index
         self.focal_gamma = focal_gamma
+        self.ordinal_weight = ordinal_weight
+        self.n_classes = n_classes
         self.task_weights = nn.Parameter(task_weights, requires_grad=False)
-        # Register class weights as buffers (one per task)
         for t_idx, w in class_weights.items():
             self.register_buffer(f"cw_{t_idx}", w, persistent=False)
+        # Fixed class index vector for expected-class computation
+        self.register_buffer(
+            "class_idx",
+            torch.arange(n_classes, dtype=torch.float32),
+            persistent=False,
+        )
 
     def forward(
         self,
@@ -85,23 +101,38 @@ class MaskedMultiTaskLoss(nn.Module):
             tgt = targets[:, t_idx]                   # (B, H, W)
             tgt = torch.where(valid_mask, tgt, torch.full_like(tgt, self.ignore_index))
 
-            if (tgt != self.ignore_index).sum() == 0:
+            valid_pix = tgt != self.ignore_index
+            if not valid_pix.any():
                 continue
 
             cw = getattr(self, f"cw_{t_idx}")
 
             if self.focal_gamma > 0:
-                loss = self._focal_loss(logits, tgt, cw, self.focal_gamma)
+                ce_loss = self._focal_loss(logits, tgt, cw, self.focal_gamma)
             else:
-                loss = F.cross_entropy(
+                ce_loss = F.cross_entropy(
                     logits, tgt,
                     weight=cw,
                     ignore_index=self.ignore_index,
                     reduction="mean",
                 )
 
-            per_task_losses[t_idx] = loss.detach()
-            total = total + self.task_weights[t_idx] * loss
+            task_loss = ce_loss
+
+            # Ordinal MSE: penalises expected_class vs true_class quadratically
+            if self.ordinal_weight > 0:
+                probs = F.softmax(logits.float(), dim=1)   # (B, C, H, W)
+                ci = self.class_idx.view(1, -1, 1, 1)
+                expected_cls = (probs * ci).sum(dim=1)     # (B, H, W)
+                # Normalise by (N-1)² so scale matches QWK weights
+                ord_loss = F.mse_loss(
+                    expected_cls[valid_pix],
+                    tgt[valid_pix].float(),
+                ) / (self.n_classes - 1) ** 2
+                task_loss = task_loss + self.ordinal_weight * ord_loss
+
+            per_task_losses[t_idx] = task_loss.detach()
+            total = total + self.task_weights[t_idx] * task_loss
             active_weight = active_weight + self.task_weights[t_idx]
 
         return total / active_weight.clamp(min=1e-6), per_task_losses
@@ -145,10 +176,13 @@ def build_loss(
     )
 
     focal_gamma = config["loss"].get("focal_gamma", 0.0) if config["loss"]["type"] == "focal" else 0.0
+    ordinal_weight = config["loss"].get("ordinal_weight", 0.0)
 
     return MaskedMultiTaskLoss(
         class_weights=class_weights,
         task_weights=tw,
         ignore_index=-1,
         focal_gamma=focal_gamma,
+        ordinal_weight=ordinal_weight,
+        n_classes=config["n_classes"],
     )

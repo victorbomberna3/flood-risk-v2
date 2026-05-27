@@ -9,7 +9,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, cohen_kappa_score
 
 
 def build_optimizer(model: nn.Module, config: dict) -> torch.optim.Optimizer:
@@ -50,41 +50,50 @@ def evaluate(
     n_tasks: int = 5,
     n_classes: int = 5,
 ) -> dict:
-    """Compute Macro F1 per task on a dataset."""
+    """Compute QWK and Macro F1 per task on a dataset."""
     model.eval()
-    # Accumulate predictions/labels per task (could be huge — use per-batch f1)
-    # For simplicity, collect all at the end. Memory ~OK for validation set.
     all_preds = [[] for _ in range(n_tasks)]
     all_trues = [[] for _ in range(n_tasks)]
 
     for x, t, vm in loader:
         x = x.to(device, non_blocking=True)
         outputs = model(x)
-        vm_np = vm.numpy()  # (B, H, W)
+        vm_np = vm.numpy()
         for i, logits in enumerate(outputs):
-            preds = logits.argmax(dim=1).cpu().numpy()   # (B, H, W)
-            trues = t[:, i].numpy()                       # (B, H, W)
+            preds = logits.argmax(dim=1).cpu().numpy()
+            trues = t[:, i].numpy()
             mask = (trues >= 0) & vm_np
             all_preds[i].append(preds[mask])
             all_trues[i].append(trues[mask])
 
     results = {}
     per_task_f1 = []
+    per_task_qwk = []
+    labels = list(range(n_classes))
     for i in range(n_tasks):
         if len(all_preds[i]) == 0:
             results[f"task_{i}_f1"] = 0.0
+            results[f"task_{i}_qwk"] = 0.0
             per_task_f1.append(0.0)
+            per_task_qwk.append(0.0)
             continue
         p = np.concatenate(all_preds[i])
         t_ = np.concatenate(all_trues[i])
         if len(t_) == 0:
-            f1 = 0.0
+            f1, qwk = 0.0, 0.0
         else:
-            f1 = f1_score(t_, p, labels=list(range(n_classes)), average="macro", zero_division=0)
-        results[f"task_{i}_f1"] = float(f1)
-        per_task_f1.append(float(f1))
+            f1 = float(f1_score(t_, p, labels=labels, average="macro", zero_division=0))
+            try:
+                qwk = float(cohen_kappa_score(t_, p, weights="quadratic", labels=labels))
+            except Exception:
+                qwk = 0.0
+        results[f"task_{i}_f1"] = f1
+        results[f"task_{i}_qwk"] = qwk
+        per_task_f1.append(f1)
+        per_task_qwk.append(qwk)
 
     results["macro_f1_mean"] = float(np.mean(per_task_f1))
+    results["qwk_mean"] = float(np.mean(per_task_qwk))
     return results
 
 
@@ -158,20 +167,22 @@ def train_model(
             **val_metrics,
         }
         history.append(log)
+        n_t = len(config["targets"])
         print(
             f"  Ep {epoch:2d}/{epochs}  "
             f"loss={train_loss:.4f}  "
-            f"val_macroF1={val_metrics['macro_f1_mean']:.4f}  "
-            f"per-task={[f'{val_metrics[f'task_{i}_f1']:.3f}' for i in range(len(config['targets']))]}  "
+            f"val_QWK={val_metrics['qwk_mean']:.4f}  "
+            f"val_F1={val_metrics['macro_f1_mean']:.4f}  "
+            f"per-task_QWK={[f\"{val_metrics[f'task_{i}_qwk']:.3f}\" for i in range(n_t)]}  "
             f"[{elapsed:.0f}s]"
         )
 
         if log_callback is not None:
             log_callback(log)
 
-        # Save best
-        if val_metrics["macro_f1_mean"] > best_metric:
-            best_metric = val_metrics["macro_f1_mean"]
+        # Save best checkpoint based on QWK (ordinal-aware metric)
+        if val_metrics["qwk_mean"] > best_metric:
+            best_metric = val_metrics["qwk_mean"]
             torch.save({
                 "epoch": epoch,
                 "model_state": model.state_dict(),
