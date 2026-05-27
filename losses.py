@@ -77,13 +77,16 @@ class MaskedMultiTaskLoss(nn.Module):
         targets: torch.Tensor,         # (B, 5, H, W) int64
         valid_mask: torch.Tensor,      # (B, H, W) bool
     ) -> tuple[torch.Tensor, dict]:
-        total = 0.0
+        total = torch.zeros(1, device=outputs[0].device)
+        active_weight = torch.zeros(1, device=outputs[0].device)
         per_task_losses = {}
 
         for t_idx, logits in enumerate(outputs):
             tgt = targets[:, t_idx]                   # (B, H, W)
-            # Mark invalid pixels with ignore_index
             tgt = torch.where(valid_mask, tgt, torch.full_like(tgt, self.ignore_index))
+
+            if (tgt != self.ignore_index).sum() == 0:
+                continue
 
             cw = getattr(self, f"cw_{t_idx}")
 
@@ -99,8 +102,9 @@ class MaskedMultiTaskLoss(nn.Module):
 
             per_task_losses[t_idx] = loss.detach()
             total = total + self.task_weights[t_idx] * loss
+            active_weight = active_weight + self.task_weights[t_idx]
 
-        return total / self.task_weights.sum(), per_task_losses
+        return total / active_weight.clamp(min=1e-6), per_task_losses
 
     @staticmethod
     def _focal_loss(
