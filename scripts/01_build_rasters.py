@@ -14,10 +14,10 @@ from pathlib import Path
 # Make src importable when running this script from project root
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import load_config
-from src.data_io import build_region_raster, save_raster
-from src.features import engineer_features
-from src.normalize import normalize_region, NormStats
+from utils import load_config
+from data_io import build_region_raster, save_raster
+from features import engineer_features
+from normalize import normalize_region, NormStats
 
 
 def main():

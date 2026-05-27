@@ -13,13 +13,13 @@ from torch.utils.data import DataLoader
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import load_config, set_seed, get_device, count_parameters, report_gpu_memory
-from src.data_io import load_raster
-from src.normalize import stack_channels
-from src.dataset import build_train_dataset
-from src.model import build_model
-from src.losses import build_loss
-from src.trainer import train_model
+from utils import load_config, set_seed, get_device, count_parameters, report_gpu_memory
+from data_io import load_raster
+from normalize import stack_channels
+from dataset import build_train_dataset
+from model import build_model
+from losses import build_loss
+from trainer import train_model
 
 
 def main():

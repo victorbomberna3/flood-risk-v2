@@ -12,12 +12,12 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.utils import load_config, set_seed, get_device
-from src.data_io import load_raster
-from src.normalize import stack_channels
-from src.model import build_model
-from src.predict import predict_region, save_predictions
-from src.evaluate import compute_metrics, save_metrics, print_summary, plot_predictions, plot_confusion_matrices
+from utils import load_config, set_seed, get_device
+from data_io import load_raster
+from normalize import stack_channels
+from model import build_model
+from predict import predict_region, save_predictions
+from evaluate import compute_metrics, save_metrics, print_summary, plot_predictions, plot_confusion_matrices
 
 
 def main():
