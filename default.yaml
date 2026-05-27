@@ -1,0 +1,125 @@
+# Flood Risk v2 — Default Configuration
+# All hyperparameters in one place. Edit and rerun without touching code.
+
+# ── Paths ────────────────────────────────────────────────────────────────────
+paths:
+  drive_data: "/content/drive/MyDrive/Hackathon II Group 2"
+  raster_cache: "/content/raster_cache"     # built once, reused
+  outputs: "/content/flood-risk-v2/outputs"
+  checkpoints: "/content/flood-risk-v2/checkpoints"
+
+# ── Region setup (Group 2) ───────────────────────────────────────────────────
+regions:
+  train: "severn"
+  test:  "northumbria"
+
+# ── Targets ──────────────────────────────────────────────────────────────────
+targets:
+  - risk_0_2m
+  - risk_0_3m
+  - risk_0_6m
+  - risk_0_9m
+  - risk_1_2m
+
+n_classes: 5            # 0=no risk, 1=Very Low, 2=Low, 3=Medium, 4=High
+
+# ── Feature channels ─────────────────────────────────────────────────────────
+# Channels used as U-Net input. Each becomes one channel in the (B, C, H, W) tensor.
+# Absolute values (dtm, x, y) are intentionally excluded — they encode regional identity.
+features:
+  terrain:
+    - dtm_rel_3        # elevation rel. to 60m neighbourhood
+    - dtm_rel_11       # elevation rel. to 220m neighbourhood
+    - dtm_rel_51       # elevation rel. to 1km neighbourhood
+    - slope            # rad
+    - aspect_sin       # circular encoding
+    - aspect_cos
+    - curvature        # Laplacian — negative = concave (water pools)
+    - roughness_3      # local std (texture)
+    - roughness_11
+    - log_flow_acc     # upstream catchment area, log-scaled
+    - twi              # Topographic Wetness Index
+    - hand             # Height Above Nearest Drainage — strongest predictor
+    - log_dist_channel # log distance to channel (river/stream)
+    - near_water       # binary: rciw > 0
+    - waw              # water/wetness category (0-5 ordinal)
+    - imd              # imperviousness 0-100%
+    - flow_dir_sin     # circular encoding
+    - flow_dir_cos
+
+  weather:
+    - precip_roll1d_max     # peak daily rainfall
+    - precip_roll7d_max     # peak 7-day rainfall
+    - precip_roll30d_max    # peak monthly rainfall
+    - precip_p95_7d         # 95th percentile of 7-day rainfall (extreme tail)
+    - precip_intensity      # max1d / mean30d — region-invariant extremeness
+    - runoff_roll7d_max     # peak surface runoff
+    - runoff_intensity
+    - soil_moist_max        # max soil moisture (saturation)
+
+# ── Normalisation ────────────────────────────────────────────────────────────
+normalize:
+  method: "robust"          # robust (median/IQR) or "zscore" (mean/std)
+  per_region: true          # compute stats per-region — KEY for cross-region transfer
+
+# ── Patches ──────────────────────────────────────────────────────────────────
+patches:
+  size: 256                 # 256 pixels × 20m = 5.12km — captures watershed scale
+  stride_train: 128         # 50% overlap during training
+  stride_inference: 128     # 50% overlap during inference (mosaic averaging)
+  min_valid_fraction: 0.5   # discard patches with > 50% NaN
+  min_labeled_fraction: 0.1 # need at least 10% labeled pixels in patch for training
+
+# ── Augmentation (training only) ─────────────────────────────────────────────
+augmentation:
+  rotations_90: true        # 4 orientations
+  flips: true               # H + V flips
+  # Combined → 8 dihedral transforms (D4 symmetry group)
+  rotate_directional_features: true   # rotate flow_dir/aspect when patch rotates
+
+# ── Model ────────────────────────────────────────────────────────────────────
+model:
+  arch: "unet"
+  base_channels: 32         # encoder doubles: 32 → 64 → 128 → 256 → 512
+  depth: 4                  # 4 downsampling levels
+  dropout: 0.1
+  batchnorm: true
+
+# ── Training ─────────────────────────────────────────────────────────────────
+training:
+  batch_size: 16
+  num_workers: 4
+  epochs: 30
+  lr: 1.0e-3
+  weight_decay: 1.0e-4
+  optimizer: "adamw"
+  scheduler: "cosine"
+  warmup_epochs: 2
+  mixed_precision: true
+  grad_clip: 1.0
+  seed: 42
+
+# ── Loss ─────────────────────────────────────────────────────────────────────
+loss:
+  type: "weighted_ce"       # weighted_ce or focal
+  focal_gamma: 2.0          # only used if type=focal
+  class_weight_method: "inverse_freq"   # inverse_freq or effective_num
+  task_weights:             # weight each depth equally — fine to tune later
+    risk_0_2m: 1.0
+    risk_0_3m: 1.0
+    risk_0_6m: 1.0
+    risk_0_9m: 1.0
+    risk_1_2m: 1.0
+
+# ── Validation ───────────────────────────────────────────────────────────────
+validation:
+  strategy: "spatial_block" # spatial_block (recommended) or random
+  block_size_pixels: 256    # validation blocks size
+  val_fraction: 0.2         # 20% of Severn patches held out
+  monitor_metric: "macro_f1_mean"
+  save_best_only: true
+
+# ── Inference ────────────────────────────────────────────────────────────────
+inference:
+  tta: true                 # test-time augmentation: avg predictions over flips/rotations
+  batch_size: 32

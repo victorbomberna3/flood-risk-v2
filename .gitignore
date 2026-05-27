@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Environments
+.env
+.venv
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data (large files — keep in Google Drive or mounted in Colab)
+*.tif
+*.tiff
+*.nc
+*.h5
+*.hdf5
+*.parquet
+*.csv
+*.npy
+*.npz
+data/
+raw/
+processed/
+
+# Model checkpoints (large — keep in Drive)
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+runs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
