@@ -4,6 +4,7 @@
 Usage:
     python scripts/02_train.py --config configs/default.yaml
 """
+import gc
 import sys
 import argparse
 from pathlib import Path
@@ -47,12 +48,24 @@ def main():
     available = [f for f in feature_names if f in raster.terrain]
     print(f"  Using {len(available)} features (of {len(feature_names)} configured)")
 
-    channels = stack_channels(raster.terrain, feature_names, valid_mask=raster.valid_mask)
-    raster.terrain = {}  # free ~8 GB before further processing
-    channels = np.nan_to_num(channels, nan=0.0, posinf=0.0, neginf=0.0)
-    channels = np.clip(channels, -500, 500)
+    # Build channels into a disk-backed memmap — avoids allocating 8 GB in RAM
+    # on top of the already-loaded source arrays.
+    h, w = raster.valid_mask.shape
+    mmap_path = "/tmp/channels.dat"
+    channels = np.memmap(mmap_path, dtype=np.float32, mode="w+",
+                         shape=(len(feature_names), h, w))
+    for i, name in enumerate(feature_names):
+        arr = raster.terrain.pop(name, np.zeros((h, w), dtype=np.float32)).astype(np.float32)
+        arr = np.where(raster.valid_mask, arr, np.float32(0.0))
+        arr = np.nan_to_num(arr, nan=0.0, posinf=0.0, neginf=0.0)
+        np.clip(arr, -500.0, 500.0, out=arr)
+        channels[i] = arr
+        del arr
+    raster.terrain = {}
+    gc.collect()
+    channels.flush()
     print(f"  Channel tensor shape: {channels.shape}  ({channels.dtype})")
-    print(f"  Memory: {channels.nbytes / 1e9:.2f} GB")
+    print(f"  Disk-backed memmap: {channels.nbytes / 1e9:.2f} GB")
 
     # Build datasets
     print("\n  Building train/val datasets...")
