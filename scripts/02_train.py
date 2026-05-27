@@ -37,21 +37,18 @@ def main():
     cache_dir = Path(config["paths"]["raster_cache"])
     train_region = config["regions"]["train"]
 
-    print(f"\n  Loading {train_region} raster...")
-    raster = load_raster(cache_dir / f"raster_{train_region}.npz")
-    print(f"  {raster}")
-
     # Channel order from config
     feature_names = config["features"]["terrain"] + config["features"]["weather"]
 
-    # Verify all features exist
-    missing = [f for f in feature_names if f not in raster.terrain]
-    if missing:
-        print(f"  WARNING: missing features {missing} — will be zero-filled")
+    print(f"\n  Loading {train_region} raster...")
+    raster = load_raster(cache_dir / f"raster_{train_region}.npz", feature_names=feature_names)
+    print(f"  {raster}")
+
     available = [f for f in feature_names if f in raster.terrain]
     print(f"  Using {len(available)} features (of {len(feature_names)} configured)")
 
     channels = stack_channels(raster.terrain, feature_names, valid_mask=raster.valid_mask)
+    raster.terrain = {}  # free ~8 GB before further processing
     channels = np.nan_to_num(channels, nan=0.0, posinf=0.0, neginf=0.0)
     channels = np.clip(channels, -500, 500)
     print(f"  Channel tensor shape: {channels.shape}  ({channels.dtype})")

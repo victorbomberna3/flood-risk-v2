@@ -165,11 +165,19 @@ def save_raster(raster: RegionRaster, out_path: str | Path) -> None:
     print(f"  Saved {out_path.name} ({size_mb:.0f} MB)")
 
 
-def load_raster(in_path: str | Path) -> RegionRaster:
-    """Load a saved RegionRaster from .npz."""
+def load_raster(in_path: str | Path, feature_names: list[str] | None = None) -> RegionRaster:
+    """Load a saved RegionRaster from .npz.
+
+    feature_names: if given, only load these terrain features (saves RAM).
+    """
     in_path = Path(in_path)
     data = np.load(in_path, allow_pickle=False)
-    terrain = {k[len("terrain__"):]: data[k] for k in data.files if k.startswith("terrain__")}
+    needed = set(feature_names) if feature_names is not None else None
+    terrain = {
+        k[len("terrain__"):]: data[k]
+        for k in data.files
+        if k.startswith("terrain__") and (needed is None or k[len("terrain__"):] in needed)
+    }
     region = str(data["region"][0])
     return RegionRaster(
         region=region,
