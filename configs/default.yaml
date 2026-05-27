@@ -37,7 +37,10 @@ features:
     - curvature        # Laplacian — negative = concave (water pools)
     - roughness_3      # local std (texture)
     - roughness_11
-    - log_flow_acc     # upstream catchment area, log-scaled
+    - log_flow_acc        # upstream catchment area, log-scaled
+    - flow_acc_lag_3x3    # neighbourhood mean of log_flow_acc (3x3)
+    - flow_acc_lag_11x11  # neighbourhood mean of log_flow_acc (11x11)
+    - flow_acc_anomaly    # local convergence hotspot: pixel vs neighbourhood
     - twi              # Topographic Wetness Index
     - hand             # Height Above Nearest Drainage — strongest predictor
     - log_dist_channel # log distance to channel (river/stream)

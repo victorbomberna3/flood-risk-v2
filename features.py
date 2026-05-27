@@ -89,6 +89,15 @@ def engineer_terrain(terrain_dict: dict, valid_mask: np.ndarray) -> dict:
         flow_acc_filled = np.nan_to_num(flow_acc, nan=0.0)
         out["log_flow_acc"] = _safe_log1p(flow_acc_filled)
 
+        # Spatial lag: neighbourhood mean of log_flow_acc
+        log_fa = out["log_flow_acc"]
+        out["flow_acc_lag_3x3"]  = uniform_filter(log_fa, size=3).astype(np.float32)
+        out["flow_acc_lag_11x11"] = uniform_filter(log_fa, size=11).astype(np.float32)
+
+        # Spatial anomaly: how much more upstream area does this pixel have
+        # than its immediate neighbourhood? Identifies local convergence hotspots.
+        out["flow_acc_anomaly"] = (log_fa - out["flow_acc_lag_11x11"]).astype(np.float32)
+
         # TWI = ln(flow_acc / tan(slope))
         tan_slope = np.tan(slope).clip(min=1e-3)
         fa_clip = np.clip(flow_acc_filled, 1, None)
