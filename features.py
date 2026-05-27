@@ -160,7 +160,7 @@ def engineer_weather(weather_dict: dict) -> dict:
         # Intensity ratio: peak / climatology — region-invariant extremeness
         if "precip_roll30d_mean" in out:
             denom = np.clip(out["precip_roll30d_mean"], 1e-8, None)
-            out["precip_intensity"] = (out["precip_roll1d_max"] / denom).astype(np.float32)
+            out["precip_intensity"] = np.clip(out["precip_roll1d_max"] / denom, 0, 100).astype(np.float32)
 
     # Runoff
     if "sro" in weather_dict:
@@ -171,7 +171,7 @@ def engineer_weather(weather_dict: dict) -> dict:
             out[f"runoff_roll{w}d_mean"] = roll.mean(axis=0).astype(np.float32)
         if "runoff_roll30d_mean" in out:
             denom = np.clip(out["runoff_roll30d_mean"], 1e-8, None)
-            out["runoff_intensity"] = (out["runoff_roll7d_max"] / denom).astype(np.float32)
+            out["runoff_intensity"] = np.clip(out["runoff_roll7d_max"] / denom, 0, 100).astype(np.float32)
 
     # Soil moisture
     if "swvl1_mean" in weather_dict:

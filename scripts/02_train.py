@@ -53,6 +53,7 @@ def main():
 
     channels = stack_channels(raster.terrain, feature_names, valid_mask=raster.valid_mask)
     channels = np.nan_to_num(channels, nan=0.0, posinf=0.0, neginf=0.0)
+    channels = np.clip(channels, -500, 500)
     print(f"  Channel tensor shape: {channels.shape}  ({channels.dtype})")
     print(f"  Memory: {channels.nbytes / 1e9:.2f} GB")
 
