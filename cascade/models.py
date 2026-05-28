@@ -139,13 +139,19 @@ def train_stage_a(
             callbacks=[lgb.early_stopping(100, verbose=False), lgb.log_evaluation(0)],
         )
         oof[va] = booster.predict(X.iloc[va], num_iteration=booster.best_iteration)
-        aucs.append(roc_auc_score(y[va], oof[va]))
         models.append(booster)
-        print(f"  [Stage A] fold {i}  AUC={aucs[-1]:.4f}", flush=True)
+        n_classes = len(np.unique(y[va]))
+        if n_classes < 2:
+            print(f"  [Stage A] fold {i}  AUC=skip (only one class in val fold)", flush=True)
+        else:
+            auc = roc_auc_score(y[va], oof[va])
+            aucs.append(auc)
+            print(f"  [Stage A] fold {i}  AUC={auc:.4f}", flush=True)
 
+    cv_auc = float(np.mean(aucs)) if aucs else float("nan")
     return {
         "best_params": best, "models": models,
-        "oof": oof, "cv_auc": float(np.mean(aucs)), "study": study,
+        "oof": oof, "cv_auc": cv_auc, "study": study,
     }
 
 
