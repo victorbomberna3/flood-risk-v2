@@ -98,6 +98,7 @@ def train_stage_a(
         params = {
             "objective": "binary", "metric": "auc", "is_unbalance": True,
             "verbosity": -1, "seed": seed, "num_threads": 0, "device_type": device,
+            "feature_pre_filter": False,
             "num_leaves": trial.suggest_int("num_leaves", 31, 255),
             "learning_rate": trial.suggest_float("learning_rate", 0.02, 0.1, log=True),
             "min_data_in_leaf": trial.suggest_int("min_data_in_leaf", 50, 500),
@@ -126,7 +127,7 @@ def train_stage_a(
         **study.best_params,
         "objective": "binary", "metric": "auc", "is_unbalance": True,
         "verbosity": -1, "seed": seed, "bagging_freq": 5,
-        "num_threads": 0, "device_type": device,
+        "num_threads": 0, "device_type": device, "feature_pre_filter": False,
     }
     print(f"Stage A: HPO done  best AUC={study.best_value:.4f}; refitting 5 folds", flush=True)
 
