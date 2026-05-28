@@ -154,7 +154,7 @@ def main():
     any_risk = np.zeros(len(idx_lab), dtype=int)
     for d in range(5):
         ok = tgt_lab[:, d] >= 0
-        any_risk[ok & (tgt_lab[ok, d] > 0)] = 1
+        any_risk[ok & (tgt_lab[:, d] > 0)] = 1
     print(
         f"  any_risk=1: {any_risk.sum():,}   "
         f"any_risk=0: {(any_risk == 0).sum():,}"
